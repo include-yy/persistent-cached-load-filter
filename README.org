@@ -1,0 +1,51 @@
+* PCLF --- Persistent Cached Load Filter
+
+This package provides a persistent cache mechanism for =load-path=
+lookups to speed up Emacs startup and library loading.
+
+It leverages the =load-path-filter-function= variable introduced in
+Emacs 31. By caching the directory locations of loaded libraries to a
+file, it reduces the number of system calls (stat/access) required when
+=require= or =load= is called, particularly beneficial for systems with
+slow I/O or large =load-path= lists.
+
+** Install and Use
+
+Use the following command to install:
+
+#+begin_src text
+package-vc-install RET https://github.com/include-yy/persistent-cached-load-filter RET
+#+end_src
+
+Or in your init.el file:
+
+#+begin_src elisp
+  (setopt package-vc-selected-packages
+          '(;; Other packages
+            ;; ...
+            (persistent-cached-load-filter
+             :url "https://github.com/include-yy/persistent-cached-load-filter")))
+
+  (package-vc-install-selected-packages)
+#+end_src
+
+After installation, add these lines in your init.el as early as possible:
+
+#+begin_src elisp
+  (when (require 'persistent-cached-load-filter nil t)
+    (persistent-cached-load-filter-easy-setup))
+#+end_src
+
+** Cache Lifecycle
+
+The package manages the cache automatically during your Emacs session:
+
+- *Runtime Updates:* When a library is requested via =load= or =require= and is not found in the cache, PCLF performs a standard search. The result is immediately added to the in-memory cache.
+- *Automatic Saving:* The cache is saved to =load-path-cache.eld= in your =user-emacs-directory= automatically when Emacs exits. It only writes to disk if changes were made during the session.
+
+** Manual Operations
+
+You can manually manage the cache with the following commands:
+
+- =M-x persistent-cached-load-filter-write-cache= :: Immediately writes the in-memory cache to disk. It automatically removes duplicates and non-existent files before writing.
+- =M-x persistent-cached-load-filter-clear-cache= :: Clears the cache from both memory and disk. Use this if you want to force a complete rebuild of the cache.
