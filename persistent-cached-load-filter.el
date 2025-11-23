@@ -77,6 +77,7 @@
 ;;; Code:
 (require 'pcase)
 (require 'seq)
+(require 'radix-tree)
 
 (defconst t-filename "load-path-cache.eld"
   "Name of the cache file.")
@@ -105,10 +106,23 @@ and MATCHES is a list of directories containing FILE.
 The value is initialized by reading from the disk cache file when
 this package is loaded.  This involves file I/O during startup.")
 
+(defvar t--exist-path-table (make-hash-table)
+  "Hash table for checking the existence of directories in `load-path'.
+
+This hash table is used to memoize the results of directory existence
+checks within the main filter function `persistent-cached-load-filter'.")
+
 (defvar t--need-update nil
   "Non-nil means the cache has changed and needs to be written to disk.")
 
-;;;###autoload
+(defun t--path-included-p (path all-path)
+  (seq-every-p
+   (lambda (p)
+     (or (gethash p t--exist-path-table)
+         (and (member p all-path)
+              (puthash p t t--exist-path-table))))
+   path))
+
 (defun persistent-cached-load-filter (path file suf)
   "Filter PATH for FILE with suffixes SUF using a persistent cache.
 
@@ -121,10 +135,12 @@ default mechanism `load-path-filter-cache-directory-files'.
 
 If a new search is performed, add it to the cache for future use."
   (if (file-name-directory file) path
-    (let ((ls-cached (alist-get file t--cache nil nil #'equal)))
-      (when (not (seq-every-p (lambda (p) (member p path)) ls-cached))
+    (let ((ls-cached (radix-tree-lookup t--cache file)))
+      ;;(alist-get file t--cache nil nil #'equal)))
+      (when (not (t--path-included-p ls-cached path))
         (setq t--need-update t)
-        (setq t--cache (seq-remove (lambda (x) (equal file (car x))) t--cache))
+        (setq t--cache (radix-tree-insert t--cache file nil))
+        ;; (setq t--cache (seq-remove (lambda (x) (equal file (car x))) t--cache))
         (setq ls-cached nil))
       (or ls-cached
           (let ((ls (load-path-filter-cache-directory-files path file suf)))
@@ -133,21 +149,28 @@ If a new search is performed, add it to the cache for future use."
             (if (eq path ls) path
               (when ls
                 (setq t--need-update t)
-                (push (cons file ls) t--cache)
+                (setq t--cache (radix-tree-insert t--cache file ls))
+                ;; (push (cons file ls) t--cache)
                 ls)))))))
 
 (defun t--try-uniquify-cache ()
   "Remove duplicates and non-existent files from the cache.
 Return the cleaned list.  Verify that the cached files actually
 exist on disk using the current load suffixes."
-  (let* ((suffixes (cons "" (get-load-suffixes))))
-    (seq-keep
-     (pcase-lambda (`(,name . ,paths))
+  (let* ((suffixes (get-load-suffixes))
+         (ht (make-hash-table :test #'equal))
+         (alist nil))
+    (radix-tree-iter-mappings
+     t--cache
+     (lambda (name paths)
        ;; Actually we use `locate-file' here, so the shadowed path will be ignored.
-       (when-let* ((file (locate-file name paths suffixes)))
-         (cons name (list (directory-file-name (file-name-directory file))))))
-     t--cache)))
-
+       (when-let* ((file (locate-file name paths suffixes))
+                   (dir (directory-file-name (file-name-directory file)))
+                   (unique-dir (with-memoization (gethash dir ht)
+                                 (puthash dir dir ht))))
+         (push (cons name unique-dir) alist))))
+    (radix-tree-from-map alist)))
+                              
 (defun t-write-cache ()
   "Write the uniquified load path cache to disk.
 Filter cache to remove duplicates and entries for files that
@@ -157,8 +180,9 @@ no longer exist, then write the result to
 Do nothing if `persistent-cached-load-filter--need-update' is nil."
   (interactive)
   (when (and t--cache t--need-update)
-    (with-temp-file t-cache-path
-      (pp (t--try-uniquify-cache) (current-buffer)))))
+    (let ((print-circle t))
+      (with-temp-file t-cache-path
+        (pp (t--try-uniquify-cache) (current-buffer))))))
 
 (defun t-clear-cache ()
   "Clear the content of the persistent load path cache file.
@@ -167,7 +191,7 @@ This resets both the cache file on disk and the in-memory variable."
   (setq t--cache nil)
   (setq t--need-update nil)
   (with-temp-file t-cache-path
-    (insert "()")))
+    (insert (format "%S" radix-tree-empty))))
 
 (defun t-easy-setup ()
   "Configure the persistent load path cache.
