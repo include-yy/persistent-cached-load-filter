@@ -62,17 +62,12 @@
 ;; To write cache to file manually, use `persistent-cached-load-filter-write-cache'.
 ;; To clear cache, use `persistent-cached-load-filter-clear-cache'.
 ;;
-;; TODOs:
+;; TODO:
 ;;
 ;; * The current implementation shadows packages with the same name
 ;;   appearing later in the load-path (similar to standard Emacs
 ;;   behavior).  Future versions might explore improvements to this
 ;;   logic.
-;;
-;; * The current cache implementation uses an alist.  This might become
-;;   a performance bottleneck if the number of entries in load-path is
-;;   very large.  Consider using other data structures such as plists,
-;;   hash-tables, or avl-trees.
 
 ;;; Code:
 (require 'pcase)
@@ -97,31 +92,17 @@ does not exist or if an error occurs during reading."
           (buffer-string))
         read))))
 
-(defvar t--cache (t--read-cache)
+(defvar t--cache (or (t--read-cache) radix-tree-empty)
   "In-memory cache for `load-path' filtering.
-This variable is an alist where each element is a cons cell of the
-form (FILE . MATCHES).  FILE is the file name string being sought,
-and MATCHES is a list of directories containing FILE.
+
+This variable is a radix tree where keys are file name strings and
+values are lists of directories containing those files.
 
 The value is initialized by reading from the disk cache file when
 this package is loaded.  This involves file I/O during startup.")
 
-(defvar t--exist-path-table (make-hash-table)
-  "Hash table for checking the existence of directories in `load-path'.
-
-This hash table is used to memoize the results of directory existence
-checks within the main filter function `persistent-cached-load-filter'.")
-
 (defvar t--need-update nil
   "Non-nil means the cache has changed and needs to be written to disk.")
-
-(defun t--path-included-p (path all-path)
-  (seq-every-p
-   (lambda (p)
-     (or (gethash p t--exist-path-table)
-         (and (member p all-path)
-              (puthash p t t--exist-path-table))))
-   path))
 
 (defun persistent-cached-load-filter (path file suf)
   "Filter PATH for FILE with suffixes SUF using a persistent cache.
@@ -136,11 +117,10 @@ default mechanism `load-path-filter-cache-directory-files'.
 If a new search is performed, add it to the cache for future use."
   (if (file-name-directory file) path
     (let ((ls-cached (radix-tree-lookup t--cache file)))
-      ;;(alist-get file t--cache nil nil #'equal)))
-      (when (not (t--path-included-p ls-cached path))
+      (when (not (seq-every-p (lambda (p) (member p path)) ls-cached))
         (setq t--need-update t)
+        ;; Removing the key by inserting nil
         (setq t--cache (radix-tree-insert t--cache file nil))
-        ;; (setq t--cache (seq-remove (lambda (x) (equal file (car x))) t--cache))
         (setq ls-cached nil))
       (or ls-cached
           (let ((ls (load-path-filter-cache-directory-files path file suf)))
@@ -150,14 +130,16 @@ If a new search is performed, add it to the cache for future use."
               (when ls
                 (setq t--need-update t)
                 (setq t--cache (radix-tree-insert t--cache file ls))
-                ;; (push (cons file ls) t--cache)
                 ls)))))))
 
 (defun t--try-uniquify-cache ()
   "Remove duplicates and non-existent files from the cache.
-Return the cleaned list.  Verify that the cached files actually
-exist on disk using the current load suffixes."
+Return the cleaned radix tree.
+
+This function also performs string interning on directory paths to
+reduce memory usage and disk footprint."
   (let* ((suffixes (get-load-suffixes))
+         ;; Helper hash table for string interning
          (ht (make-hash-table :test #'equal))
          (alist nil))
     (radix-tree-iter-mappings
@@ -166,6 +148,7 @@ exist on disk using the current load suffixes."
        ;; Actually we use `locate-file' here, so the shadowed path will be ignored.
        (when-let* ((file (locate-file name paths suffixes))
                    (dir (directory-file-name (file-name-directory file)))
+                   ;; Intern the directory string.
                    (unique-dir (with-memoization (gethash dir ht)
                                  (puthash dir dir ht))))
          (push (cons name (list unique-dir)) alist))))
@@ -188,10 +171,10 @@ Do nothing if `persistent-cached-load-filter--need-update' is nil."
   "Clear the content of the persistent load path cache file.
 This resets both the cache file on disk and the in-memory variable."
   (interactive)
-  (setq t--cache nil)
+  (setq t--cache radix-tree-empty)
   (setq t--need-update nil)
   (with-temp-file t-cache-path
-    (insert (format "%S" radix-tree-empty))))
+    (prin1 radix-tree-empty (current-buffer))))
 
 (defun t-easy-setup ()
   "Configure the persistent load path cache.
@@ -203,7 +186,6 @@ and add `persistent-cached-load-filter-write-cache' to
     (add-hook 'kill-emacs-hook #'t-write-cache)))
 
 (provide 'persistent-cached-load-filter)
-
 ;; Local Variables:
 ;; read-symbol-shorthands: (("t-" . "persistent-cached-load-filter-"))
 ;; End:
