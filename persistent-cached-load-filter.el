@@ -290,6 +290,9 @@ This resets both the cache file on disk and the in-memory variable."
   (interactive)
   (setq t--cache (t--ini))
   (setq t--need-update nil)
+  ;; Disable autosave when exiting Emacs to avoid writing additional
+  ;; non-init time caching to disk.
+  (remove-hook 'kill-emacs-hook #'t-write-cache)
   (with-temp-file t-cache-path
     (prin1 nil (current-buffer))))
 
