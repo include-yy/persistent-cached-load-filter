@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 include-yy
 
 ;; Author: include-yy <yy@egh0bww1.com>
-;; Version: 0.2
+;; Version: 0.3
 ;; Package-Requires: ((emacs "31"))
 ;; Keywords: speedup, tools
 ;; URL: https://github.com/include-yy/persistent-cached-load-filter
@@ -270,7 +270,6 @@ reduce memory usage and disk footprint."
          (push (cons name (list unique-dir)) alist)))
      t--cache)
     (t--from-alist alist)))
-
 
 (defun t-write-cache ()
   "Write the uniquified load path cache to disk.
