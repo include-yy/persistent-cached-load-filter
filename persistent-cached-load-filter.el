@@ -203,7 +203,8 @@ FUNCTION is called with (KEY VALUE), where KEY is a string.
          (map-into (mapcar (pcase-lambda (`(,k . ,v))
                              (cons (intern k) v))
                            alist)
-                   type)))
+                   (if (not (eq t-assoc-type 'hash+eq)) type
+                     '(hash-table :test eq)))))
       ((or 'alist+equal 'plist+equal 'hash+equal)
        (lambda (alist) (map-into alist type)))
       ('radix (lambda (alist) (radix-tree-from-map alist)))
@@ -291,7 +292,7 @@ This resets both the cache file on disk and the in-memory variable."
   (setq t--cache (t--ini))
   (setq t--need-update nil)
   (with-temp-file t-cache-path
-    (prin1 t--cache (current-buffer))))
+    (prin1 nil (current-buffer))))
 
 (defun t-easy-setup ()
   "Configure the persistent load path cache.
