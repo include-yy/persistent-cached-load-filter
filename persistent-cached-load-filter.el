@@ -74,7 +74,7 @@
 ;; * The current implementation shadows packages with the same name
 ;;   appearing later in the load-path (similar to standard Emacs
 ;;   behavior).  Future versions might explore improvements to this
-;;   logic.
+;;   logic.  Use `list-load-path-shadows' to check shadowed packages.
 
 ;;; Code:
 (require 'pcase)
@@ -106,12 +106,30 @@ subsequent errors.  Clear the cache file if you change types."
 
 (defvar t-assoc-type 'radix
   "The data structure used for the in-memory cache.
-Must be set before loading the package.
 
-Valid values:
+This variable must be set BEFORE loading the package, as the
+internal accessor functions are statically defined via `defalias'
+at load time to ensure zero-overhead access.
 
-hash+equal, alist+equal, plist+equal,
-hash+eq, alist+eq, plist+eq, radix.")
+Valid values fall into three categories:
+
+1. Radix Tree
+   `radix'       : Use `radix-tree'.  Optimized for string keys
+                   sharing common prefixes.
+
+2. Hash Tables
+   `hash+equal'  : Hash table with string keys.  O(1) lookup.
+   `hash+eq'     : Hash table with interned symbol keys.
+
+3. Linear Lists
+   `alist+equal' : Association list with string keys.  O(N) lookup.
+   `plist+equal' : Property list with string keys.
+   `alist+eq'    : Association list with interned symbol keys.
+   `plist+eq'    : Property list with interned symbol keys.
+
+Note on `+eq' variants:
+These options intern file name strings into symbols to use `eq' for
+fast pointer comparison.")
 
 (defun t--error-type ()
   (error "Unknown associative array type: %s" t-assoc-type))
