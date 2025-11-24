@@ -168,7 +168,7 @@ exist on disk using the current load suffixes."
                    (dir (directory-file-name (file-name-directory file)))
                    (unique-dir (with-memoization (gethash dir ht)
                                  (puthash dir dir ht))))
-         (push (cons name unique-dir) alist))))
+         (push (cons name (list unique-dir)) alist))))
     (radix-tree-from-map alist)))
                               
 (defun t-write-cache ()
