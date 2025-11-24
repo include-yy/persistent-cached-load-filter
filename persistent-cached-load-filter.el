@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 include-yy
 
 ;; Author: include-yy <yy@egh0bww1.com>
-;; Version: 0.1
+;; Version: 0.2
 ;; Package-Requires: ((emacs "31"))
 ;; Keywords: speedup, tools
 ;; URL: https://github.com/include-yy/persistent-cached-load-filter
