@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 include-yy
 
 ;; Author: include-yy <yy@egh0bww1.com>
-;; Version: 0.3
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "31"))
 ;; Keywords: speedup, tools
 ;; URL: https://github.com/include-yy/persistent-cached-load-filter
@@ -104,7 +104,7 @@ subsequent errors.  Clear the cache file if you change types."
           (buffer-string))
         read))))
 
-(defvar t-assoc-type 'radix
+(defvar t-assoc-type 'hash+eq
   "The data structure used for the in-memory cache.
 
 This variable must be set BEFORE loading the package, as the

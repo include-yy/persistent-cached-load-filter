@@ -51,7 +51,7 @@ and configuration in one go.
 #+begin_src elisp
   (use-package persistent-cached-load-filter :ensure t
     :vc (:url "https://github.com/include-yy/persistent-cached-load-filter"
-              :branch "main" :rev :newest)
+              :branch "master" :rev :newest)
     :init
     ;; Optional: Choose the underlying data structure
     (setq persistent-cached-load-filter-assoc-type 'radix)
