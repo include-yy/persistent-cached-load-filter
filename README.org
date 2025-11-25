@@ -1,13 +1,12 @@
 * PCLF --- Persistent Cached Load Filter
 
 This package provides a persistent cache mechanism for =load-path=
-lookups to speed up Emacs startup and library loading.
-
-It leverages the =load-path-filter-function= variable introduced in
-Emacs 31. By caching the directory locations of loaded libraries to a
-file, it reduces the number of system calls (stat/access) required when
-=require= or =load= is called, particularly beneficial for systems with
-slow I/O or large =load-path= lists.
+lookups to speed up Emacs startup and library loading.  It leverages the
+=load-path-filter-function= variable introduced in Emacs 31. By caching
+the directory locations of loaded libraries to a file, it reduces the
+number of system calls (stat/access) required when =require= or =load=
+is called, particularly beneficial for systems with slow I/O or large
+=load-path= lists.
 
 ** Install and Use
 
@@ -29,9 +28,16 @@ Or in your init.el file:
   (package-vc-install-selected-packages)
 #+end_src
 
-After installation, add these lines in your init.el as early as possible:
+After installation, add these lines in your init.el as early as
+possible.
+
+*Important:* If you wish to use a non-default data structure (see
+below), you must set the variable *before* loading the package.
 
 #+begin_src elisp
+  ;; Optional: Choose the underlying data structure
+  ;; (setq persistent-cached-load-filter-assoc-type 'hash+equal)
+
   (when (require 'persistent-cached-load-filter nil t)
     (persistent-cached-load-filter-easy-setup))
 #+end_src
@@ -40,12 +46,55 @@ After installation, add these lines in your init.el as early as possible:
 
 The package manages the cache automatically during your Emacs session:
 
-- *Runtime Updates:* When a library is requested via =load= or =require= and is not found in the cache, PCLF performs a standard search. The result is immediately added to the in-memory cache.
-- *Automatic Saving:* The cache is saved to =load-path-cache.eld= in your =user-emacs-directory= automatically when Emacs exits. It only writes to disk if changes were made during the session.
+- *Runtime Updates:* When a library is requested via =load= or =require=
+  and is not found in the cache, PCLF performs a standard search. The
+  result is immediately added to the in-memory cache.
+- *Automatic Saving:* The cache is saved to =load-path-cache.eld= in
+  your =user-emacs-directory= automatically when Emacs exits. It only
+  writes to disk if changes were made during the session.
 
 ** Manual Operations
 
 You can manually manage the cache with the following commands:
 
-- =M-x persistent-cached-load-filter-write-cache= :: Immediately writes the in-memory cache to disk. It automatically removes duplicates and non-existent files before writing.
-- =M-x persistent-cached-load-filter-clear-cache= :: Clears the cache from both memory and disk. Use this if you want to force a complete rebuild of the cache.
+- =M-x persistent-cached-load-filter-write-cache= :: Immediately writes
+  the in-memory cache to disk. It automatically removes duplicates and
+  non-existent files before writing.
+- =M-x persistent-cached-load-filter-clear-cache= :: Clears the cache
+  from both memory and disk. Use this if you want to force a complete
+  rebuild of the cache.
+
+** Advanced Configuration: Data Structures
+
+PCLF supports multiple backend data structures for the in-memory
+cache. You can configure this via
+=persistent-cached-load-filter-assoc-type=.
+
+*Performance Note:* This variable dictates which functions are aliased
+at load time to ensure zero-overhead access. Therefore, it must be set
+**before** the package is loaded.
+
+*** Available Types
+
+- *Radix Tree (Default)*
+  - Symbol: ='radix=
+  - Optimized for string keys sharing common prefixes.
+
+- *Hash Tables (Fastest Lookup)*
+  - Symbol: ='hash+equal= (String keys), ='hash+eq= (Interned symbol keys)
+  - Provides O(1) lookup speed.
+
+- *Linear Lists (For Benchmarking)*
+  - Symbols: ='alist+equal=, ='plist+equal=, etc.
+  - Linear scan O(N). Useful mostly for performance comparison against
+    Hash/Radix implementations.
+
+*** ⚠️ Changing Data Structures
+
+If you change =persistent-cached-load-filter-assoc-type=, the format of
+the data saved to disk changes. You *MUST* clear the old cache before
+restarting Emacs, otherwise, reading the mismatched cache file will
+result in errors.
+
+Run =M-x persistent-cached-load-filter-clear-cache= before or
+immediately after changing the type.
