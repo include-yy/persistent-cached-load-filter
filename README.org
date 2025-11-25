@@ -2,11 +2,12 @@
 
 This package provides a persistent cache mechanism for =load-path=
 lookups to speed up Emacs startup and library loading.  It leverages the
-=load-path-filter-function= variable introduced in Emacs 31. By caching
-the directory locations of loaded libraries to a file, it reduces the
-number of system calls (stat/access) required when =require= or =load=
-is called, particularly beneficial for systems with slow I/O or large
-=load-path= lists.
+=load-path-filter-function= variable introduced in Emacs 31.
+
+By caching the directory locations of loaded libraries to a file, it
+reduces the number of system calls (stat/access) required when =require=
+or =load= is called, particularly beneficial for systems with slow I/O
+or large =load-path= lists.
 
 ** Install and Use
 
@@ -16,7 +17,7 @@ Use the following command to install:
 package-vc-install RET https://github.com/include-yy/persistent-cached-load-filter RET
 #+end_src
 
-Or in your init.el file:
+Or use =package-vc= in your init.el file:
 
 #+begin_src elisp
   (setopt package-vc-selected-packages
@@ -24,21 +25,37 @@ Or in your init.el file:
             ;; ...
             (persistent-cached-load-filter
              :url "https://github.com/include-yy/persistent-cached-load-filter")))
-
   (package-vc-install-selected-packages)
 #+end_src
 
 After installation, add these lines in your init.el as early as
 possible.
 
+#+begin_src elisp
+  (when (boundp 'load-path-filter-function)
+    (when (require 'persistent-cached-load-filter nil t)
+      (persistent-cached-load-filter-easy-setup)))
+#+end_src
+
 *Important:* If you wish to use a non-default data structure (see
 below), you must set the variable *before* loading the package.
 
 #+begin_src elisp
   ;; Optional: Choose the underlying data structure
-  ;; (setq persistent-cached-load-filter-assoc-type 'hash+equal)
+  (setq persistent-cached-load-filter-assoc-type 'radix)
+#+end_src
 
-  (when (require 'persistent-cached-load-filter nil t)
+Of course, you can also use =use-package= to complete the installation
+and configuration in one go.
+
+#+begin_src elisp
+  (use-package persistent-cached-load-filter :ensure t
+    :vc (:url "https://github.com/include-yy/persistent-cached-load-filter"
+              :branch "main" :rev :newest)
+    :init
+    ;; Optional: Choose the underlying data structure
+    (setq persistent-cached-load-filter-assoc-type 'radix)
+    :config
     (persistent-cached-load-filter-easy-setup))
 #+end_src
 
@@ -72,17 +89,17 @@ cache. You can configure this via
 
 *Performance Note:* This variable dictates which functions are aliased
 at load time to ensure zero-overhead access. Therefore, it must be set
-**before** the package is loaded.
+*before* the package is loaded.
 
 *** Available Types
 
-- *Radix Tree (Default)*
+- *Hash Tables (Fastest Lookup)*
+  - Symbol: ='hash+equal= (String keys, *default*), ='hash+eq= (Interned symbol keys)
+  - Provides O(1) lookup speed.
+
+- *Radix Tree*
   - Symbol: ='radix=
   - Optimized for string keys sharing common prefixes.
-
-- *Hash Tables (Fastest Lookup)*
-  - Symbol: ='hash+equal= (String keys), ='hash+eq= (Interned symbol keys)
-  - Provides O(1) lookup speed.
 
 - *Linear Lists (For Benchmarking)*
   - Symbols: ='alist+equal=, ='plist+equal=, etc.
