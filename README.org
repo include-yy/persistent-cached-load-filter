@@ -1,6 +1,6 @@
 * PCLF --- Persistent Cached Load Filter
 
-#+HTML: <img src="logo.jpg" align="right" width="30%">
+#+HTML: <img src="logo.jpg" align="right" width="25%">
 
 This package provides a persistent cache mechanism for =load-path=
 lookups to speed up Emacs startup and library loading.  It leverages the
