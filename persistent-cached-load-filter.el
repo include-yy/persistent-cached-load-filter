@@ -232,7 +232,8 @@ FUNCTION is called with (KEY VALUE), where KEY is a string.
 (defvar t--cache (or (t--read-cache) (t--ini))
   "In-memory cache for `load-path' filtering.
 
-The specific data structure depends on `persistent-cached-load-filter-assoc-type'.
+The specific data structure depends on
+`persistent-cached-load-filter-assoc-type'.
 
 The value is initialized by reading from the disk cache file when
 this package is loaded.  This involves file I/O during startup.")
